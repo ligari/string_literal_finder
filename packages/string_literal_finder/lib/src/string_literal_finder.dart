@@ -245,10 +245,20 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     return false;
   }
 
-  bool _shouldIgnore(AstNode origNode) {
+  bool _shouldIgnore(StringLiteral origNode) {
     AstNode? node = origNode;
     AstNode? nodeChild;
     AstNode? nodeChildChild;
+
+    if (origNode.stringValue != null) {
+      if (origNode.stringValue!.trim().isEmpty) {
+        return true;
+      }
+      if (_onlySpecialCharsRegExp.hasMatch(origNode.stringValue!)) {
+        return true;
+      }
+    }
+
     for (;
         node != null;
         nodeChildChild = nodeChild, nodeChild = node, node = node.parent) {
@@ -360,16 +370,6 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
         if (node is FunctionDeclaration || node is MethodDeclaration) {
           if (node is Declaration) {
             if (nonNlsChecker.hasAnnotationOf(node.declaredElement2!)) {
-              return true;
-            }
-          }
-        }
-        if (node is StringLiteral) {
-          if (node.stringValue != null) {
-            if (node.stringValue!.isEmpty) {
-              return true;
-            }
-            if (_onlySpecialCharsRegExp.hasMatch(node.stringValue!)) {
               return true;
             }
           }
