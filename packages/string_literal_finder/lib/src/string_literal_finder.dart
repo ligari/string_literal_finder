@@ -364,6 +364,16 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             }
           }
         }
+        if (node is StringLiteral) {
+          if (node.stringValue != null) {
+            if (node.stringValue!.isEmpty) {
+              return true;
+            }
+            if (_onlySpecialCharsRegExp.hasMatch(node.stringValue!)) {
+              return true;
+            }
+          }
+        }
       } catch (e, stackTrace) {
         final loc = lineInfo!.getLocation(origNode.offset);
         _logger.severe('Error while analysing node $origNode at $filePath $loc',
@@ -387,3 +397,5 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     return false;
   }
 }
+
+RegExp _onlySpecialCharsRegExp = RegExp(r'^[^\w\s]+$');
