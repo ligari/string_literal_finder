@@ -23,6 +23,7 @@ final _logger = Logger('string_literal_finder.plugin');
 class StringLiteralFinderPlugin extends ServerPlugin {
   StringLiteralFinderPlugin(ResourceProvider provider)
       : super(resourceProvider: provider);
+  final RegExp _onlySpecialCharsRegExp = RegExp(r'^[^\w\s]+$');
 
   @override
   List<String> get fileGlobsToAnalyze => <String>['**/*.dart'];
@@ -166,6 +167,20 @@ class StringLiteralFinderPlugin extends ServerPlugin {
       filePath: filePath,
       unit: unit,
       foundStringLiteral: (foundStringLiteral) {
+        if (foundStringLiteral.stringValue == null) {
+          _logger.warning(
+              'Found string literal without value: $foundStringLiteral');
+          return;
+        }
+        if (foundStringLiteral.stringValue!.trim().isEmpty) {
+          _logger.finer('Found empty string literal: $foundStringLiteral');
+          return;
+        }
+        if (_onlySpecialCharsRegExp.hasMatch(foundStringLiteral.stringValue!)) {
+          _logger.finer(
+              'Found string literal with only special chars: $foundStringLiteral');
+          return;
+        }
         final location = plugin.Location(
           foundStringLiteral.filePath,
           foundStringLiteral.charOffset,
@@ -485,12 +500,11 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     return AnalysisOptions.loadFromYaml(optionsPath.readAsStringSync());
   }
 
-  // @override
-  // void sendNotificationsForSubscriptions(
-  //     Map<String, List<AnalysisService>> subscriptions) {
-  //   TODO: implement sendNotificationsForSubscriptions
-  // }
-
+// @override
+// void sendNotificationsForSubscriptions(
+//     Map<String, List<AnalysisService>> subscriptions) {
+//   TODO: implement sendNotificationsForSubscriptions
+// }
 }
 
 class AnalysisOptions {
