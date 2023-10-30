@@ -31,6 +31,7 @@ abstract class ExcludePathChecker {
     excludePathCheckerStartsWith('l10n'),
     excludePathCheckerEndsWith('.g.dart'),
     excludePathCheckerEndsWith('.freezed.dart'),
+    excludePathCheckerEndsWith('.mapper.dart'),
   ];
 
   bool shouldExclude(String path);
@@ -39,6 +40,7 @@ abstract class ExcludePathChecker {
 class _ExcludePathCheckerImpl extends ExcludePathChecker {
   const _ExcludePathCheckerImpl(
       {required this.predicate, required this.description});
+
   final bool Function(String path) predicate;
   final String description;
 
@@ -144,7 +146,9 @@ class FoundStringLiteral {
   final StringLiteral stringLiteral;
 
   int get charOffset => stringLiteral.beginToken.charOffset;
+
   int get charEnd => stringLiteral.endToken.charEnd;
+
   int get charLength => charEnd - charOffset;
 }
 
@@ -167,6 +171,9 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     TypeChecker.fromUrl(
         'package:flutter/src/widgets/navigator.dart#RouteSettings'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#ValueKey'),
+    TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#UniqueKey'),
+    TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#LocalKey'),
+    TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#Key'),
     TypeChecker.fromUrl(
         'package:flutter/src/services/platform_channel.dart#MethodChannel'),
     TypeChecker.fromRuntime(StateError),
@@ -320,6 +327,9 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
           }
         }
         if (node is MethodInvocation) {
+          if (node.methodName.name == 'debugPrint') {
+            return true;
+          }
           if (nodeChildChild is! Expression) {
             _logger.warning('not an expression. $nodeChildChild ($node)');
             // } else if (nodeChildChild != origNode) {
