@@ -257,6 +257,9 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
       if (_onlySpecialCharsRegExp.hasMatch(origNode.stringValue!)) {
         return true;
       }
+      if (origNode.stringValue! == "...") {
+        return true;
+      }
     }
 
     for (;
