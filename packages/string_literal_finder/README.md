@@ -51,8 +51,8 @@ configuring `string_literal_finder` as a analyyer plugin.
     ```yaml
     string_literal_finder:
       exclude_globs:
-        - '**/*.g.dart' # included as default
-        - '**/*.freezed.dart' # included as default
+        - '**/*.g.dart' # included as default only for command line application
+        - '**/*.freezed.dart' # included as default only for command line application
     ```
    
     optionally add constructor calls using URIs to types that shall be ignored to `analysis_options.yaml`:
