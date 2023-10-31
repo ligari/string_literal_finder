@@ -110,21 +110,6 @@ class StringLiteralFinder {
         filePath: filePath,
         unit: unit,
         foundStringLiteral: (foundStringLiteral) {
-          if (foundStringLiteral.stringValue == null) {
-            _logger.warning(
-                'Found string literal without value: $foundStringLiteral');
-            return;
-          }
-          if (foundStringLiteral.stringValue!.trim().isEmpty) {
-            _logger.finer('Found empty string literal: $foundStringLiteral');
-            return;
-          }
-          if (_onlySpecialCharsRegExp
-              .hasMatch(foundStringLiteral.stringValue!)) {
-            _logger.finer(
-                'Found string literal with only special chars: $foundStringLiteral');
-            return;
-          }
           foundStringLiterals.add(foundStringLiteral);
         });
     unit.visitChildren(visitor);
@@ -272,9 +257,6 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
         return true;
       }
       if (_onlySpecialCharsRegExp.hasMatch(origNode.stringValue!)) {
-        return true;
-      }
-      if (origNode.stringValue! == "...") {
         return true;
       }
     }
