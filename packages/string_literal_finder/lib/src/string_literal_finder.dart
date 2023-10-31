@@ -159,10 +159,11 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     required this.foundStringLiteral,
   }) : lineInfo = unit.lineInfo;
 
-  static const loggerChecker = TypeChecker.fromRuntime(Logger);
   static const nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
-  static const exceptionChecker = TypeChecker.fromRuntime(Exception);
-  static const errorChecker = TypeChecker.fromRuntime(Error);
+  static const ignoredMethodInvocationTargets = [
+    TypeChecker.fromRuntime(Logger),
+    TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
+  ];
   static const ignoredConstructorCalls = [
     TypeChecker.fromRuntime(Uri),
     TypeChecker.fromRuntime(RegExp),
@@ -177,9 +178,9 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     TypeChecker.fromUrl(
         'package:flutter/src/services/platform_channel.dart#MethodChannel'),
     TypeChecker.fromRuntime(StateError),
-    loggerChecker,
-    exceptionChecker,
-    errorChecker,
+    TypeChecker.fromRuntime(Logger),
+    TypeChecker.fromRuntime(Exception),
+    TypeChecker.fromRuntime(Error),
   ];
 
   final String filePath;
@@ -364,8 +365,13 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             // ignore all calls to `Logger`
             if (target.staticType == null) {
               _logger.warning('Unable to resolve type for $target');
-            } else if (loggerChecker.isAssignableFromType(target.staticType!)) {
-              return true;
+            } else {
+              final staticType = target.staticType!;
+              for (final checker in ignoredMethodInvocationTargets) {
+                if (checker.isAssignableFromType(staticType)) {
+                  return true;
+                }
+              }
             }
           }
         }
