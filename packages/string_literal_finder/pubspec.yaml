@@ -14,7 +14,12 @@ dependencies:
   logging_appenders: ">=1.0.0 <2.0.0"
   path: ">=1.8.0 <2.0.0"
   source_gen: ">=1.0.2 <2.0.0"
-  string_literal_finder_annotations: ^1.0.0
+#  string_literal_finder_annotations: ^1.0.0
+  string_literal_finder_annotations:
+    git:
+        url: git@github.com:ligari/string_literal_finder.git
+        ref: develop
+        path: packages/string_literal_finder_annotations
   args: ">=2.0.0 <3.0.0"
   analyzer_plugin: ">=0.7.0 <0.12.0"
   glob: ">=2.0.0 <3.0.0"

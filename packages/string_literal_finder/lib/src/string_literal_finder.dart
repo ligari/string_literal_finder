@@ -249,9 +249,11 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
           orElse: () => throw StateError(
               'Unable to find parameter of name ${arg.name.label} for '
               '$executableElement'));
-    } else {
-      param = executableElement!.parameters[argPos];
+    } else if (executableElement != null) {
+      param = executableElement.parameters[argPos];
       assert(param.isPositional);
+    } else {
+      return false;
     }
     if (nonNlsChecker.hasAnnotationOf(param)) {
 //      _logger.finest('XX Argument is annotated with NonNls.');
