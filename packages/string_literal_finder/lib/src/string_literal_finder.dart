@@ -159,6 +159,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     required this.foundStringLiteral,
   }) : lineInfo = unit.lineInfo;
 
+  // Database expressions
   static const nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
   static const ignoredMethodInvocationTargets = [
     TypeChecker.fromRuntime(Logger),
@@ -167,6 +168,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
   static const ignoredConstructorCalls = [
     TypeChecker.fromRuntime(Uri),
     TypeChecker.fromRuntime(RegExp),
+    TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
     TypeChecker.fromUrl(
         'package:flutter/src/painting/image_resolution.dart#AssetImage'),
     TypeChecker.fromUrl(
