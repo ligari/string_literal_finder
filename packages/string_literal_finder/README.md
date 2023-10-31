@@ -51,8 +51,24 @@ configuring `string_literal_finder` as a analyyer plugin.
     ```yaml
     string_literal_finder:
       exclude_globs:
-        - '**/*.g.dart'
-        - '**/*.freezed.dart'
+        - '**/*.g.dart' # included as default
+        - '**/*.freezed.dart' # included as default
+    ```
+   
+    optionally add constructor calls using URIs to types that shall be ignored to `analysis_options.yaml`:
+
+    ```yaml
+    string_literal_finder:
+      ignore_constructor_calls:
+        - 'package:flutter/src/widgets/image.dart#Image' # included as default
+    ```
+   
+    optionally add method invocation targets using URIs to types that shall be ignored to `analysis_options.yaml`:
+
+    ```yaml
+    string_literal_finder:
+      ignore_method_invocation_targets:
+        - 'package:flutter/src/widgets/image.dart#Image'
     ```
 
 3. Restart your analyser.

@@ -164,6 +164,9 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     final visitor = StringLiteralVisitor<dynamic>(
       filePath: filePath,
       unit: unit,
+      ignoreConstructorCallsUris: analysisOptions.ignoreConstructorCalls,
+      ignoreMethodInvocationTargetsUris:
+          analysisOptions.ignoreMethodInvocationTargets,
       foundStringLiteral: (foundStringLiteral) {
         final location = plugin.Location(
           foundStringLiteral.filePath,
@@ -479,7 +482,11 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     final exists = optionsPath?.exists ?? false;
     if (!exists || optionsPath == null) {
       _logger.warning('Unable to resolve optionsFile.');
-      return AnalysisOptions(excludeGlobs: []);
+      return AnalysisOptions(
+        excludeGlobs: [],
+        ignoreConstructorCalls: [],
+        ignoreMethodInvocationTargets: [],
+      );
     }
     return AnalysisOptions.loadFromYaml(optionsPath.readAsStringSync());
   }
@@ -494,6 +501,8 @@ class StringLiteralFinderPlugin extends ServerPlugin {
 class AnalysisOptions {
   AnalysisOptions({
     required this.excludeGlobs,
+    required this.ignoreConstructorCalls,
+    required this.ignoreMethodInvocationTargets,
     this.debug = false,
   });
 
@@ -503,13 +512,28 @@ class AnalysisOptions {
     final options = yaml['string_literal_finder'] as Map<String, dynamic>?;
     final excludeGlobs =
         options?['exclude_globs'] as List<dynamic>? ?? <dynamic>[];
+    final ignoreConstructorCalls =
+        options?['ignore_constructor_calls'] as List<dynamic>? ?? <dynamic>[];
+    final ignoreMethodInvocationTargets =
+        options?['ignore_method_invocation_targets'] as List<dynamic>? ??
+            <dynamic>[];
     final debug = options?['debug'] as bool? ?? false;
     return AnalysisOptions(
       excludeGlobs: excludeGlobs.cast<String>().map((e) => Glob(e)).toList(),
+      ignoreConstructorCalls: ignoreConstructorCalls
+          .cast<String>()
+          .map((e) => Uri.parse(e))
+          .toList(),
+      ignoreMethodInvocationTargets: ignoreMethodInvocationTargets
+          .cast<String>()
+          .map((e) => Uri.parse(e))
+          .toList(),
       debug: debug,
     );
   }
 
+  final List<Uri> ignoreConstructorCalls;
+  final List<Uri> ignoreMethodInvocationTargets;
   final List<Glob> excludeGlobs;
   final bool debug;
 

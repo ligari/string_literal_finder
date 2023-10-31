@@ -109,6 +109,8 @@ class StringLiteralFinder {
     final visitor = StringLiteralVisitor<dynamic>(
         filePath: filePath,
         unit: unit,
+        ignoreConstructorCallsUris: [], // TODO: parse options
+        ignoreMethodInvocationTargetsUris: [], // TODO: parse options
         foundStringLiteral: (foundStringLiteral) {
           foundStringLiterals.add(foundStringLiteral);
         });
@@ -157,15 +159,27 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     required this.filePath,
     required this.unit,
     required this.foundStringLiteral,
-  }) : lineInfo = unit.lineInfo;
+    required List<Uri> ignoreConstructorCallsUris,
+    required List<Uri> ignoreMethodInvocationTargetsUris,
+  })  : lineInfo = unit.lineInfo,
+        ignoreConstructorCalls = [
+          ...defaultIgnoreConstructorCalls,
+          ...ignoreConstructorCallsUris.map((e) => TypeChecker.fromUrl(e)),
+        ],
+        ignoreMethodInvocationTargets = [
+          ...defaultIgnoreMethodInvocationTargets,
+          ...ignoreMethodInvocationTargetsUris
+              .map((e) => TypeChecker.fromUrl(e)),
+        ];
 
   // Database expressions
   static const nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
-  static const ignoredMethodInvocationTargets = [
+  final List<TypeChecker> ignoreMethodInvocationTargets;
+  static const defaultIgnoreMethodInvocationTargets = [
     TypeChecker.fromRuntime(Logger),
-    TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
   ];
-  static const ignoredConstructorCalls = [
+  final List<TypeChecker> ignoreConstructorCalls;
+  static const defaultIgnoreConstructorCalls = [
     TypeChecker.fromRuntime(Uri),
     TypeChecker.fromRuntime(RegExp),
     TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
@@ -322,7 +336,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
           }
 //        param.no
 //          node.constructorName.staticElement;
-          for (final ignoredConstructorCall in ignoredConstructorCalls) {
+          for (final ignoredConstructorCall in ignoreConstructorCalls) {
             if (ignoredConstructorCall
                 .isAssignableFrom(node.staticType!.element2!)) {
               return true;
@@ -364,12 +378,12 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
           }
           final target = node.target;
           if (target != null) {
-            // ignore all calls to `Logger`
+            // ignore calls to types
             if (target.staticType == null) {
               _logger.warning('Unable to resolve type for $target');
             } else {
               final staticType = target.staticType!;
-              for (final checker in ignoredMethodInvocationTargets) {
+              for (final checker in ignoreMethodInvocationTargets) {
                 if (checker.isAssignableFromType(staticType)) {
                   return true;
                 }
