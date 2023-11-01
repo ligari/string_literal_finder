@@ -21,6 +21,13 @@ const _argMetricsFile = 'metrics-output-file';
 const _argAnnotationFile = 'annotations-output-file';
 const _argAnnotationRoot = 'annotations-path-root';
 
+final excludePathDefaults = [
+  ExcludePathChecker.excludePathCheckerStartsWith('l10n'),
+  ExcludePathChecker.excludePathCheckerEndsWith('.g.dart'),
+  ExcludePathChecker.excludePathCheckerEndsWith('.freezed.dart'),
+  ExcludePathChecker.excludePathCheckerEndsWith('.mapper.dart'),
+];
+
 Future<void> main(List<String> arguments) async {
   PrintAppender.setupLogging(level: Level.SEVERE);
   final parser = ArgParser()
@@ -61,7 +68,7 @@ Future<void> main(List<String> arguments) async {
     final absolutePath = path.absolute(basePath);
     final stringLiteralFinder = StringLiteralFinder(
       basePath: absolutePath,
-      excludePaths: ExcludePathChecker.excludePathDefaults
+      excludePaths: excludePathDefaults
           .followedBy((results[_argExcludePath] as List<String>)
               .map((e) => ExcludePathChecker.excludePathCheckerStartsWith(e)))
           .followedBy((results[_argExcludeSuffix] as List<String>)

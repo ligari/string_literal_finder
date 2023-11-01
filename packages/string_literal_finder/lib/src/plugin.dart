@@ -164,9 +164,10 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     final visitor = StringLiteralVisitor<dynamic>(
       filePath: filePath,
       unit: unit,
-      ignoreConstructorCallsUris: analysisOptions.ignoreConstructorCalls,
-      ignoreMethodInvocationTargetsUris:
+      ignoreConstructorCalls: analysisOptions.ignoreConstructorCalls,
+      ignoreMethodInvocationTargets:
           analysisOptions.ignoreMethodInvocationTargets,
+      ignoreStringLiteralRegexes: analysisOptions.ignoreStringLiteralRegexes,
       foundStringLiteral: (foundStringLiteral) {
         final location = plugin.Location(
           foundStringLiteral.filePath,
@@ -486,6 +487,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
         excludeGlobs: [],
         ignoreConstructorCalls: [],
         ignoreMethodInvocationTargets: [],
+        ignoreStringLiteralRegexes: [],
       );
     }
     return AnalysisOptions.loadFromYaml(optionsPath.readAsStringSync());
@@ -503,6 +505,7 @@ class AnalysisOptions {
     required this.excludeGlobs,
     required this.ignoreConstructorCalls,
     required this.ignoreMethodInvocationTargets,
+    required this.ignoreStringLiteralRegexes,
     this.debug = false,
   });
 
@@ -517,6 +520,9 @@ class AnalysisOptions {
     final ignoreMethodInvocationTargets =
         options?['ignore_method_invocation_targets'] as List<dynamic>? ??
             <dynamic>[];
+    final ignoreStringLiteralRegexes =
+        options?['ignore_string_literal_regexes'] as List<dynamic>? ??
+            <dynamic>[];
     final debug = options?['debug'] as bool? ?? false;
     return AnalysisOptions(
       excludeGlobs: excludeGlobs.cast<String>().map((e) => Glob(e)).toList(),
@@ -528,12 +534,17 @@ class AnalysisOptions {
           .cast<String>()
           .map((e) => Uri.parse(e))
           .toList(),
+      ignoreStringLiteralRegexes: ignoreStringLiteralRegexes
+          .cast<String>()
+          .map((e) => RegExp(e))
+          .toList(),
       debug: debug,
     );
   }
 
   final List<Uri> ignoreConstructorCalls;
   final List<Uri> ignoreMethodInvocationTargets;
+  final List<RegExp> ignoreStringLiteralRegexes;
   final List<Glob> excludeGlobs;
   final bool debug;
 

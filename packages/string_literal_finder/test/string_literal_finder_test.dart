@@ -30,8 +30,9 @@ Future<List<FoundStringLiteral>> _findStrings(String source) async {
   final x = StringLiteralVisitor<dynamic>(
     filePath: filePath,
     unit: parsed.unit,
-    ignoreConstructorCallsUris: [],
-    ignoreMethodInvocationTargetsUris: [],
+    ignoreConstructorCalls: [],
+    ignoreMethodInvocationTargets: [],
+    ignoreStringLiteralRegexes: [],
     foundStringLiteral: (found) {
       foundStrings.add(found);
       _logger.fine('Found String ${found.stringValue}');

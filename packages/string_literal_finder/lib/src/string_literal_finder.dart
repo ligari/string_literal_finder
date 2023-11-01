@@ -27,13 +27,6 @@ abstract class ExcludePathChecker {
         description: 'Ends with: $exclude',
       );
 
-  static final excludePathDefaults = [
-    excludePathCheckerStartsWith('l10n'),
-    excludePathCheckerEndsWith('.g.dart'),
-    excludePathCheckerEndsWith('.freezed.dart'),
-    excludePathCheckerEndsWith('.mapper.dart'),
-  ];
-
   bool shouldExclude(String path);
 }
 
@@ -100,7 +93,7 @@ class StringLiteralFinder {
   Future<void> _analyzeSingleFile(
       AnalysisContext context, String filePath) async {
     _logger.fine('analyzing $filePath');
-//    final result = context.currentSession.getParsedUnit(filePath);
+    // TODO: parse options
     final result = await context.currentSession.getResolvedUnit(filePath);
     if (result is! ResolvedUnitResult) {
       throw StateError('Did not resolve to valid unit.');
@@ -109,8 +102,9 @@ class StringLiteralFinder {
     final visitor = StringLiteralVisitor<dynamic>(
         filePath: filePath,
         unit: unit,
-        ignoreConstructorCallsUris: [], // TODO: parse options
-        ignoreMethodInvocationTargetsUris: [], // TODO: parse options
+        ignoreConstructorCalls: [],
+        ignoreMethodInvocationTargets: [],
+        ignoreStringLiteralRegexes: [],
         foundStringLiteral: (foundStringLiteral) {
           foundStringLiterals.add(foundStringLiteral);
         });
@@ -159,27 +153,33 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     required this.filePath,
     required this.unit,
     required this.foundStringLiteral,
-    required List<Uri> ignoreConstructorCallsUris,
-    required List<Uri> ignoreMethodInvocationTargetsUris,
+    required List<Uri> ignoreConstructorCalls,
+    required List<Uri> ignoreMethodInvocationTargets,
+    required List<RegExp> ignoreStringLiteralRegexes,
   })  : lineInfo = unit.lineInfo,
-        ignoreConstructorCalls = [
-          ...defaultIgnoreConstructorCalls,
-          ...ignoreConstructorCallsUris.map((e) => TypeChecker.fromUrl(e)),
+        ignoreConstructorCallTypeCheckers = [
+          ...defaultIgnoreConstructorCallTypeCheckers,
+          ...ignoreConstructorCalls.map((e) => TypeChecker.fromUrl(e)),
         ],
-        ignoreMethodInvocationTargets = [
-          ...defaultIgnoreMethodInvocationTargets,
-          ...ignoreMethodInvocationTargetsUris
-              .map((e) => TypeChecker.fromUrl(e)),
+        ignoreMethodInvocationTargetTypeCheckers = [
+          ...defaultIgnoreMethodInvocationTargetTypeCheckers,
+          ...ignoreMethodInvocationTargets.map((e) => TypeChecker.fromUrl(e)),
+        ],
+        ignoreStringLiteralRegexes = [
+          ...ignoreStringLiteralRegexes,
         ];
 
   // Database expressions
-  static const nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
-  final List<TypeChecker> ignoreMethodInvocationTargets;
-  static const defaultIgnoreMethodInvocationTargets = [
+  static const TypeChecker nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
+  final List<RegExp> ignoreStringLiteralRegexes;
+  static const List<RegExp> defaultIgnoreStringLiteralRegexes = [];
+  final List<TypeChecker> ignoreMethodInvocationTargetTypeCheckers;
+  static const List<TypeChecker>
+      defaultIgnoreMethodInvocationTargetTypeCheckers = [
     TypeChecker.fromRuntime(Logger),
   ];
-  final List<TypeChecker> ignoreConstructorCalls;
-  static const defaultIgnoreConstructorCalls = [
+  final List<TypeChecker> ignoreConstructorCallTypeCheckers;
+  static const List<TypeChecker> defaultIgnoreConstructorCallTypeCheckers = [
     TypeChecker.fromRuntime(Uri),
     TypeChecker.fromRuntime(RegExp),
     TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
@@ -269,28 +269,32 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
     AstNode? nodeChild;
     AstNode? nodeChildChild;
 
+    // test regular expressions
     if (origNode.stringValue != null) {
-      if (origNode.stringValue!.trim().isEmpty) {
-        return true;
-      }
-      if (_onlySpecialCharsRegExp.hasMatch(origNode.stringValue!)) {
-        return true;
+      for (final regExp in ignoreStringLiteralRegexes) {
+        if (regExp.hasMatch(origNode.stringValue!)) {
+          return true;
+        }
       }
     }
 
+    // iterate up the tree
     for (;
         node != null;
         nodeChildChild = nodeChild, nodeChild = node, node = node.parent) {
       try {
+        // ignore imports, parts and partOf
         if (node is ImportDirective ||
             node is PartDirective ||
             node is PartOfDirective) {
           return true;
         }
+        // ignore annotations
         if (node is Annotation) {
           _logger.finest('Ignoring annotation parameters $node');
           return true;
         }
+        // ignore annotated class fields
         if (node is ClassDeclaration) {
           if (nonNlsChecker.hasAnnotationOf(node.declaredElement2!)) {
             if (nodeChild is FieldDeclaration) {
@@ -300,6 +304,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             }
           }
         }
+        // ignore annotated indexed expressions
         if (node is IndexExpression) {
           final target = node.realTarget;
           if (target is SimpleIdentifier) {
@@ -315,6 +320,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             }
           }
         }
+        // ignore annotated enum constants
         if (node is EnumConstantArguments) {
           final constantDeclaration = node.parent as EnumConstantDeclaration;
           final constructor = constantDeclaration.constructorElement;
@@ -326,43 +332,49 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             return true;
           }
         }
+        // check constructor calls to ignore
         if (node is InstanceCreationExpression) {
           assert(nodeChild == node.argumentList);
+          // ignore annotated constructor calls
           if (_checkArgumentAnnotation(
               node.argumentList,
               node.constructorName.staticElement,
               nodeChildChild as Expression)) {
             return true;
           }
-//        param.no
-//          node.constructorName.staticElement;
-          for (final ignoredConstructorCall in ignoreConstructorCalls) {
+          // ignore constructor calls to types
+          for (final ignoredConstructorCall
+              in ignoreConstructorCallTypeCheckers) {
             if (ignoredConstructorCall
                 .isAssignableFrom(node.staticType!.element2!)) {
               return true;
             }
           }
         }
+        // ignore annotated variable declarations
         if (node is VariableDeclaration) {
           final element = node.declaredElement2;
           if (element != null && nonNlsChecker.hasAnnotationOf(element)) {
             return true;
           }
         }
+        // ignore annotated function parameters
         if (node is FormalParameter) {
           final element = node.declaredElement;
           if (element != null && nonNlsChecker.hasAnnotationOf(element)) {
             return true;
           }
         }
+        // check method calls to ignore
         if (node is MethodInvocation) {
+          // ignore selected method calls
+          // TODO: ignoring selected methodName doesn't work
           if (node.methodName.name == 'debugPrint') {
             return true;
           }
+          // ignore function calls if the invoked functions argument is annotated
           if (nodeChildChild is! Expression) {
             _logger.warning('not an expression. $nodeChildChild ($node)');
-            // } else if (nodeChildChild != origNode) {
-            //   we only care about direct method calls.
           } else if (
               // check if `nodeChildChild` is actually a full argument.
               // this can happen with sub expressions like
@@ -376,14 +388,15 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
                       nodeChildChild)) {
             return true;
           }
-          final target = node.target;
-          if (target != null) {
+          // ignore method calls to types
+          if (node.target != null) {
             // ignore calls to types
-            if (target.staticType == null) {
-              _logger.warning('Unable to resolve type for $target');
+            if (node.target!.staticType == null) {
+              _logger
+                  .warning('Unable to resolve staticType for ${node.target}');
             } else {
-              final staticType = target.staticType!;
-              for (final checker in ignoreMethodInvocationTargets) {
+              final staticType = node.target!.staticType!;
+              for (final checker in ignoreMethodInvocationTargetTypeCheckers) {
                 if (checker.isAssignableFromType(staticType)) {
                   return true;
                 }
@@ -391,6 +404,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             }
           }
         }
+        // ignore annotated function or method declarations
         if (node is FunctionDeclaration || node is MethodDeclaration) {
           if (node is Declaration) {
             if (nonNlsChecker.hasAnnotationOf(node.declaredElement2!)) {
@@ -404,7 +418,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
             e, stackTrace);
       }
     }
-    // see if we can find a line end comment.
+    // ignore line-end comments
     final lineNumber = lineInfo!.getLocation(origNode.end).lineNumber;
     var nextToken = origNode.endToken.next;
     while (nextToken != null &&
@@ -418,8 +432,7 @@ class StringLiteralVisitor<R> extends GeneralizingAstVisitor<R> {
         return true;
       }
     }
+    // else don't ignore
     return false;
   }
 }
-
-RegExp _onlySpecialCharsRegExp = RegExp(r'^[^\w\s]+$');

@@ -70,6 +70,16 @@ configuring `string_literal_finder` as a analyyer plugin.
       ignore_method_invocation_targets:
         - 'package:flutter/src/widgets/image.dart#Image'
     ```
+   
+    optionally add regular expressions to ignore matching string literals to `analysis_options.yaml`:
+
+    ```yaml
+    string_literal_finder:
+      ignore_string_literal_regexes:
+        - '^\s*$' # ignore empty or whitespace-only strings
+        - '^https?://' # ignore http(s) urls
+        - '^[^\w]+$' # ignore strings containing only special characters or whitespace
+    ```
 
 3. Restart your analyser.
 
