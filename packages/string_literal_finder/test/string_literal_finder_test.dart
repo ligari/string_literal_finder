@@ -7,7 +7,8 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:logging/logging.dart';
 import 'package:logging_appenders/logging_appenders.dart';
 import 'package:path/path.dart' as p;
-import 'package:string_literal_finder/src/string_literal_finder.dart';
+import 'package:string_literal_finder/src/found_string_literal.dart';
+import 'package:string_literal_finder/src/string_literal_finder_visitor.dart';
 import 'package:test/test.dart';
 
 final _logger = Logger('string_literal_finder_test');
@@ -27,7 +28,7 @@ Future<List<FoundStringLiteral>> _findStrings(String source) async {
     throw StateError('file not found?');
   }
   final foundStrings = <FoundStringLiteral>[];
-  final x = StringLiteralVisitor<dynamic>(
+  final x = StringLiteralFinderVisitor<dynamic>(
     filePath: filePath,
     unit: parsed.unit,
     ignoreConstructorCalls: [],

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/results.dart';
@@ -11,11 +10,12 @@ import 'package:analyzer_plugin/plugin/plugin.dart';
 import 'package:analyzer_plugin/protocol/protocol_common.dart' as plugin;
 import 'package:analyzer_plugin/protocol/protocol_generated.dart' as plugin;
 import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
-import 'package:glob/glob.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:recase/recase.dart';
-import 'package:string_literal_finder/src/string_literal_finder.dart';
+import 'package:string_literal_finder/src/found_string_literal.dart';
+import 'package:string_literal_finder/src/string_literal_finder_analysis_options.dart';
+import 'package:string_literal_finder/src/string_literal_finder_visitor.dart';
 import 'package:yaml/yaml.dart';
 
 final _logger = Logger('string_literal_finder.plugin');
@@ -23,6 +23,7 @@ final _logger = Logger('string_literal_finder.plugin');
 class StringLiteralFinderPlugin extends ServerPlugin {
   StringLiteralFinderPlugin(ResourceProvider provider)
       : super(resourceProvider: provider);
+
   @override
   List<String> get fileGlobsToAnalyze => <String>['**/*.dart'];
 
@@ -32,7 +33,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
   @override
   String get version => '1.0.0';
 
-  final Map<AnalysisSession, AnalysisOptions> _options = {};
+  final Map<AnalysisSession, StringLiteralFinderAnalysisOptions> _options = {};
 
   final Map<String, File?> _arbFiles = {};
 
@@ -145,7 +146,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
 
   List<plugin.AnalysisErrorFixes> _check(
     String? root,
-    AnalysisOptions analysisOptions,
+    StringLiteralFinderAnalysisOptions analysisOptions,
     String filePath,
     CompilationUnit unit,
     ResolvedUnitResult analysisResult,
@@ -161,7 +162,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     }
     final arbFile = _findArbFile(root ?? filePath);
 
-    final visitor = StringLiteralVisitor<dynamic>(
+    final visitor = StringLiteralFinderVisitor<dynamic>(
       filePath: filePath,
       unit: unit,
       ignoreConstructorCalls: analysisOptions.ignoreConstructorCalls,
@@ -249,7 +250,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
   }
 
   List<plugin.PrioritizedSourceChange>? _extractStringFix(
-    AnalysisOptions options,
+    StringLiteralFinderAnalysisOptions options,
     File? arbFile,
     String filePath,
     FoundStringLiteral foundStringLiteral,
@@ -477,20 +478,22 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     ];
   }
 
-  AnalysisOptions _getAnalysisOptions(AnalysisContext context) {
+  StringLiteralFinderAnalysisOptions _getAnalysisOptions(
+      AnalysisContext context) {
     final optionsPath = context.contextRoot.optionsFile;
     _logger.info('Loading analysis options.');
     final exists = optionsPath?.exists ?? false;
     if (!exists || optionsPath == null) {
       _logger.warning('Unable to resolve optionsFile.');
-      return AnalysisOptions(
+      return StringLiteralFinderAnalysisOptions(
         excludeGlobs: [],
         ignoreConstructorCalls: [],
         ignoreMethodInvocationTargets: [],
         ignoreStringLiteralRegexes: [],
       );
     }
-    return AnalysisOptions.loadFromYaml(optionsPath.readAsStringSync());
+    return StringLiteralFinderAnalysisOptions.loadFromYaml(
+        optionsPath.readAsStringSync());
   }
 
 // @override
@@ -498,57 +501,4 @@ class StringLiteralFinderPlugin extends ServerPlugin {
 //     Map<String, List<AnalysisService>> subscriptions) {
 //   TODO: implement sendNotificationsForSubscriptions
 // }
-}
-
-class AnalysisOptions {
-  AnalysisOptions({
-    required this.excludeGlobs,
-    required this.ignoreConstructorCalls,
-    required this.ignoreMethodInvocationTargets,
-    required this.ignoreStringLiteralRegexes,
-    this.debug = false,
-  });
-
-  static AnalysisOptions loadFromYaml(String yamlSource) {
-    final yaml =
-        json.decode(json.encode(loadYaml(yamlSource))) as Map<String, dynamic>;
-    final options = yaml['string_literal_finder'] as Map<String, dynamic>?;
-    final excludeGlobs =
-        options?['exclude_globs'] as List<dynamic>? ?? <dynamic>[];
-    final ignoreConstructorCalls =
-        options?['ignore_constructor_calls'] as List<dynamic>? ?? <dynamic>[];
-    final ignoreMethodInvocationTargets =
-        options?['ignore_method_invocation_targets'] as List<dynamic>? ??
-            <dynamic>[];
-    final ignoreStringLiteralRegexes =
-        options?['ignore_string_literal_regexes'] as List<dynamic>? ??
-            <dynamic>[];
-    final debug = options?['debug'] as bool? ?? false;
-    return AnalysisOptions(
-      excludeGlobs: excludeGlobs.cast<String>().map((e) => Glob(e)).toList(),
-      ignoreConstructorCalls: ignoreConstructorCalls
-          .cast<String>()
-          .map((e) => Uri.parse(e))
-          .toList(),
-      ignoreMethodInvocationTargets: ignoreMethodInvocationTargets
-          .cast<String>()
-          .map((e) => Uri.parse(e))
-          .toList(),
-      ignoreStringLiteralRegexes: ignoreStringLiteralRegexes
-          .cast<String>()
-          .map((e) => RegExp(e))
-          .toList(),
-      debug: debug,
-    );
-  }
-
-  final List<Uri> ignoreConstructorCalls;
-  final List<Uri> ignoreMethodInvocationTargets;
-  final List<RegExp> ignoreStringLiteralRegexes;
-  final List<Glob> excludeGlobs;
-  final bool debug;
-
-  bool isExcluded(String path) {
-    return excludeGlobs.any((glob) => glob.matches(path));
-  }
 }

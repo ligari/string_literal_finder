@@ -6,7 +6,7 @@ import 'package:args/command_runner.dart';
 import 'package:logging/logging.dart';
 import 'package:logging_appenders/logging_appenders.dart';
 import 'package:path/path.dart' as path;
-import 'package:string_literal_finder/src/string_literal_finder.dart';
+import 'package:string_literal_finder/string_literal_finder.dart';
 
 final _logger = Logger('string_literal_finder');
 

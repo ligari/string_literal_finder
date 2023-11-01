@@ -1,10 +1,10 @@
-import 'package:string_literal_finder/src/plugin.dart';
+import 'package:string_literal_finder/src/string_literal_finder_analysis_options.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('options', () {
     test('load options', () {
-      final opts = AnalysisOptions.loadFromYaml('''
+      final opts = StringLiteralFinderAnalysisOptions.loadFromYaml('''
 string_literal_finder:
   exclude_globs:
     - '_tools/**'
@@ -18,7 +18,7 @@ string_literal_finder:
       expect(opts.isExcluded('_tools/_flutter_version_update.dart'), isTrue);
     });
     test('empty options', () {
-      final opts = AnalysisOptions.loadFromYaml('''
+      final opts = StringLiteralFinderAnalysisOptions.loadFromYaml('''
 include: loremIpsum
 
 analyzer:
