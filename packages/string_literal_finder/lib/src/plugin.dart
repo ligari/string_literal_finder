@@ -11,7 +11,7 @@ import 'package:analyzer_plugin/protocol/protocol_common.dart' as plugin;
 import 'package:analyzer_plugin/protocol/protocol_generated.dart' as plugin;
 import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
 import 'package:logging/logging.dart';
-import 'package:path/path.dart' as p;
+import 'package:path/path.dart' as path;
 import 'package:recase/recase.dart';
 import 'package:string_literal_finder/src/found_string_literal.dart';
 import 'package:string_literal_finder/src/string_literal_finder_analysis_options.dart';
@@ -21,8 +21,7 @@ import 'package:yaml/yaml.dart';
 final _logger = Logger('string_literal_finder.plugin');
 
 class StringLiteralFinderPlugin extends ServerPlugin {
-  StringLiteralFinderPlugin(ResourceProvider provider)
-      : super(resourceProvider: provider);
+  StringLiteralFinderPlugin(ResourceProvider provider) : super(resourceProvider: provider);
 
   @override
   List<String> get fileGlobsToAnalyze => <String>['**/*.dart'];
@@ -39,7 +38,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
 
   File? _findArbFile(String rootDir) {
     return _arbFiles.putIfAbsent(rootDir, () {
-      final l10nYaml = resourceProvider.getFile(p.join(rootDir, 'l10n.yaml'));
+      final l10nYaml = resourceProvider.getFile(path.join(rootDir, 'l10n.yaml'));
       if (!l10nYaml.exists) {
         _logger.warning('Unable to find l10n.yaml');
         return null;
@@ -48,8 +47,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
       final arbDir = yaml['arb-dir'] as String? ?? 'lib/l10n';
       final arbName = yaml['template-arb-file'] as String? ?? 'app_en.arb';
       _logger.fine('got yaml: $yaml -- arbDir: $arbDir / arbName: $arbName');
-      final arbFile =
-          resourceProvider.getFile(p.join(rootDir, arbDir, arbName));
+      final arbFile = resourceProvider.getFile(path.join(rootDir, arbDir, arbName));
       _logger.fine('got arbFile: $arbFile');
       if (!arbFile.exists) {
         _logger.severe('configured arb file does not exist. $arbFile');
@@ -60,14 +58,20 @@ class StringLiteralFinderPlugin extends ServerPlugin {
   }
 
   @override
-  Future<plugin.EditGetFixesResult> handleEditGetFixes(
-      plugin.EditGetFixesParams parameters) async {
+  Future<plugin.EditGetFixesResult> handleEditGetFixes(plugin.EditGetFixesParams parameters) async {
     try {
+      // find resolved unit
       final resolvedUnit = await getResolvedUnitResult(parameters.file);
-      final analysisOptions = (_options[resolvedUnit.session] ??=
-          _getAnalysisOptions(resolvedUnit.session.analysisContext));
 
+      // find analysis options & cache
+      final analysisOptions = (_options[resolvedUnit.session] ??=
+          StringLiteralFinderAnalysisOptions.fromAnalysisContext(
+              resolvedUnit.session.analysisContext));
+
+      // log
       _logger.fine('handleEditGetFixes($parameters)');
+
+      // do actual check
       final fixes = _check(
         resolvedUnit.session.analysisContext.contextRoot.root.path,
         analysisOptions,
@@ -78,8 +82,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
           .where((fix) =>
               fix.error.location.file == parameters.file &&
               fix.error.location.offset <= parameters.offset &&
-              parameters.offset <=
-                  fix.error.location.offset + fix.error.location.length &&
+              parameters.offset <= fix.error.location.offset + fix.error.location.length &&
               fix.fixes.isNotEmpty)
           .toList();
       _logger.fine('result: $fixes');
@@ -87,8 +90,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
       return plugin.EditGetFixesResult(fixes);
     } on Exception catch (e, stackTrace) {
       channel.sendNotification(
-        plugin.PluginErrorParams(false, e.toString(), stackTrace.toString())
-            .toNotification(),
+        plugin.PluginErrorParams(false, e.toString(), stackTrace.toString()).toNotification(),
       );
 
       return plugin.EditGetFixesResult([]);
@@ -106,14 +108,20 @@ class StringLiteralFinderPlugin extends ServerPlugin {
     }
     final root = analysisContext.contextRoot.root.path;
 
+    // find analysis options & cache
     final analysisOptions = (_options[analysisContext.currentSession] ??=
-        _getAnalysisOptions(analysisContext));
+        StringLiteralFinderAnalysisOptions.fromAnalysisContext(
+      analysisContext,
+    ));
+
+    // check if file is excluded
     final isAnalyzed = analysisContext.contextRoot.isAnalyzed(path);
     final isExcluded = !isAnalyzed || analysisOptions.isExcluded(path);
-    if (isExcluded) {
-      _logger.finer('is not analyzed: $path '
-          '(analyzed: $isAnalyzed / isExcluded: $isExcluded)');
 
+    if (isExcluded) {
+      _logger.finer('is not analyzed: $path (analyzed: $isAnalyzed / isExcluded: $isExcluded)');
+
+      // if excluded send empty notification
       channel.sendNotification(
         plugin.AnalysisErrorsParams(
           path,
@@ -121,27 +129,38 @@ class StringLiteralFinderPlugin extends ServerPlugin {
         ).toNotification(),
       );
       return;
-    }
-    final analysisResult =
-        await analysisContext.currentSession.getResolvedUnit(path);
+    } else {
+      // if not excluded find resolved unit
+      final analysisResult = await analysisContext.currentSession.getResolvedUnit(path);
 
-    if (analysisResult is! ResolvedUnitResult) {
-      channel.sendNotification(
-        plugin.AnalysisErrorsParams(
+      if (analysisResult is! ResolvedUnitResult) {
+        _logger.severe('Did not resolve to valid unit.');
+        // if not resolved send empty notification
+        channel.sendNotification(
+          plugin.AnalysisErrorsParams(
+            path,
+            [],
+          ).toNotification(),
+        );
+        return;
+      } else {
+        // if resolved check for errors
+        final errors = _check(
+          root,
+          analysisOptions,
           path,
-          [],
-        ).toNotification(),
-      );
-      return;
+          analysisResult.unit,
+          analysisResult,
+        );
+        // & send actual errors
+        channel.sendNotification(
+          plugin.AnalysisErrorsParams(
+            path,
+            errors.map((e) => e.error).toList(),
+          ).toNotification(),
+        );
+      }
     }
-    final errors = _check(
-        root, analysisOptions, path, analysisResult.unit, analysisResult);
-    channel.sendNotification(
-      plugin.AnalysisErrorsParams(
-        path,
-        errors.map((e) => e.error).toList(),
-      ).toNotification(),
-    );
   }
 
   List<plugin.AnalysisErrorFixes> _check(
@@ -153,21 +172,23 @@ class StringLiteralFinderPlugin extends ServerPlugin {
   ) {
     final errors = <plugin.AnalysisErrorFixes>[];
 
+    // check excluded files
     var relative = '';
     if (root != null) {
-      relative = p.relative(filePath, from: root);
+      relative = path.relative(filePath, from: root);
       if (analysisOptions.isExcluded(relative)) {
         return [];
       }
     }
+
+    // find arb file
     final arbFile = _findArbFile(root ?? filePath);
 
     final visitor = StringLiteralFinderVisitor<dynamic>(
       filePath: filePath,
       unit: unit,
       ignoreConstructorCalls: analysisOptions.ignoreConstructorCalls,
-      ignoreMethodInvocationTargets:
-          analysisOptions.ignoreMethodInvocationTargets,
+      ignoreMethodInvocationTargets: analysisOptions.ignoreMethodInvocationTargets,
       ignoreStringLiteralRegexes: analysisOptions.ignoreStringLiteralRegexes,
       foundStringLiteral: (foundStringLiteral) {
         final location = plugin.Location(
@@ -182,9 +203,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
 
         final content = analysisResult.content;
         final semicolonOffset = content.lastIndexOf(
-            ';',
-            analysisResult.lineInfo
-                .getOffsetOfLineAfter(foundStringLiteral.charEnd));
+            ';', analysisResult.lineInfo.getOffsetOfLineAfter(foundStringLiteral.charEnd));
         final fix = plugin.PrioritizedSourceChange(
           1,
           plugin.SourceChange(
@@ -226,8 +245,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
               location,
               'Found string literal: $stringCode',
               'found_string_literal',
-              correction:
-                  'Externalize string or add nonNls() decorator method, '
+              correction: 'Externalize string or add nonNls() decorator method, '
                   'or add // NON-NLS to end of line. ($filePath) ($relative)',
               hasFix: true,
             ),
@@ -258,8 +276,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
   ) {
     final stringContents = foundStringLiteral.stringLiteral.stringValue;
     if (arbFile == null || stringContents == null) {
-      _logger.severe(
-          'Unable to find arbFile or stringContents: $arbFile /// $stringContents');
+      _logger.severe('Unable to find arbFile or stringContents: $arbFile /// $stringContents');
       if (options.debug) {
         return [
           plugin.PrioritizedSourceChange(
@@ -301,14 +318,12 @@ class StringLiteralFinderPlugin extends ServerPlugin {
       builder.addInsertion(2, (builder) {
         builder.write('  "');
         // builder.addSimpleLinkedEdit(keyGroup, key);
-        builder.addSimpleLinkedEdit(keyGroup, key,
-            kind: keyKind, suggestions: keySuggestions);
+        builder.addSimpleLinkedEdit(keyGroup, key, kind: keyKind, suggestions: keySuggestions);
         builder.write('": "$stringContents",');
         builder.writeln();
         builder.write('  "@');
         // builder.addSimpleLinkedEdit(keyGroup, key);
-        builder.addSimpleLinkedEdit(keyGroup, key,
-            kind: keyKind, suggestions: keySuggestions);
+        builder.addSimpleLinkedEdit(keyGroup, key, kind: keyKind, suggestions: keySuggestions);
         builder.write('": {},');
         builder.writeln();
       });
@@ -394,14 +409,10 @@ class StringLiteralFinderPlugin extends ServerPlugin {
                   arbFile.path,
                   arbEditOffset + arbFirstLine.length + arbIndent.length + 2,
                 ),
-                plugin.Position(
-                    filePath, foundStringLiteral.charOffset + ('loc.'.length)),
+                plugin.Position(filePath, foundStringLiteral.charOffset + ('loc.'.length)),
               ],
               key.length,
-              [
-                plugin.LinkedEditSuggestion(
-                    key, plugin.LinkedEditSuggestionKind.VARIABLE)
-              ],
+              [plugin.LinkedEditSuggestion(key, plugin.LinkedEditSuggestionKind.VARIABLE)],
             ),
           ],
         ),
@@ -476,24 +487,6 @@ class StringLiteralFinderPlugin extends ServerPlugin {
         ),
       ),*/
     ];
-  }
-
-  StringLiteralFinderAnalysisOptions _getAnalysisOptions(
-      AnalysisContext context) {
-    final optionsPath = context.contextRoot.optionsFile;
-    _logger.info('Loading analysis options.');
-    final exists = optionsPath?.exists ?? false;
-    if (!exists || optionsPath == null) {
-      _logger.warning('Unable to resolve optionsFile.');
-      return StringLiteralFinderAnalysisOptions(
-        excludeGlobs: [],
-        ignoreConstructorCalls: [],
-        ignoreMethodInvocationTargets: [],
-        ignoreStringLiteralRegexes: [],
-      );
-    }
-    return StringLiteralFinderAnalysisOptions.loadFromYaml(
-        optionsPath.readAsStringSync());
   }
 
 // @override

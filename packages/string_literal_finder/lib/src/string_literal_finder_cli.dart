@@ -4,38 +4,10 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 import 'package:string_literal_finder/src/found_string_literal.dart';
+import 'package:string_literal_finder/src/string_literal_finder_analysis_options.dart';
 import 'package:string_literal_finder/src/string_literal_finder_visitor.dart';
 
 final _logger = Logger('string_literal_finder');
-
-abstract class ExcludePathChecker {
-  const ExcludePathChecker();
-
-  static ExcludePathChecker excludePathCheckerStartsWith(String exclude) =>
-      _ExcludePathCheckerImpl(
-        predicate: (path) => path.startsWith(exclude),
-        description: 'Starts with: $exclude',
-      );
-
-  static ExcludePathChecker excludePathCheckerEndsWith(String exclude) =>
-      _ExcludePathCheckerImpl(
-        predicate: (path) => path.endsWith(exclude),
-        description: 'Ends with: $exclude',
-      );
-
-  bool shouldExclude(String path);
-}
-
-class _ExcludePathCheckerImpl extends ExcludePathChecker {
-  const _ExcludePathCheckerImpl(
-      {required this.predicate, required this.description});
-
-  final bool Function(String path) predicate;
-  final String description;
-
-  @override
-  bool shouldExclude(String path) => predicate(path);
-}
 
 /// The main finder class which will analyse all
 /// dart files in the given [basePath] and look for string literals.
@@ -43,15 +15,10 @@ class _ExcludePathCheckerImpl extends ExcludePathChecker {
 class StringLiteralFinder {
   StringLiteralFinder({
     required this.basePath,
-    required this.excludePaths,
   });
 
   /// Base path of the library.
   final String basePath;
-
-  /// Paths which should be ignored. Usually something like `l10n/' to ignore
-  /// the actual translation files.
-  final List<ExcludePathChecker> excludePaths;
 
   final List<FoundStringLiteral> foundStringLiterals = [];
   final Set<String> filesSkipped = <String>{};
@@ -64,32 +31,46 @@ class StringLiteralFinder {
     final collection = AnalysisContextCollection(includedPaths: [basePath]);
     _logger.finer('Finding contexts.');
     for (final context in collection.contexts) {
+      // find analysis options
+      final analysisOptions = StringLiteralFinderAnalysisOptions.fromAnalysisContext(context);
+
+      // resolve root
+      final root = context.contextRoot.root.path;
+
       for (final filePath in context.contextRoot.analyzedFiles()) {
-        final relative = path.relative(filePath, from: basePath);
-        if (excludePaths
-                .where((element) => element.shouldExclude(relative))
-                .isNotEmpty ||
-            // exclude generated code.
-            filePath.endsWith('.g.dart')) {
+        // only include dart files & check excluded files
+        var relative = '';
+        relative = path.relative(filePath, from: root);
+        if (analysisOptions.isExcluded(relative) || !filePath.endsWith('.dart')) {
           filesSkipped.add(filePath);
           continue;
         }
+        // else analyze
         filesAnalyzed.add(filePath);
-        await _analyzeSingleFile(context, filePath);
+        await _analyzeSingleFile(
+          context: context,
+          filePath: filePath,
+          options: analysisOptions,
+        );
       }
     }
+
+    // logging
     _logger.info('Found ${foundStringLiterals.length} literals:');
     for (final f in foundStringLiterals) {
       final relative = path.relative(f.filePath, from: basePath);
       _logger.info('$relative:${f.loc} ${f.stringLiteral}');
     }
+
     return foundStringLiterals;
   }
 
-  Future<void> _analyzeSingleFile(
-      AnalysisContext context, String filePath) async {
+  Future<void> _analyzeSingleFile({
+    required AnalysisContext context,
+    required String filePath,
+    required StringLiteralFinderAnalysisOptions options,
+  }) async {
     _logger.fine('analyzing $filePath');
-    // TODO: parse options
     final result = await context.currentSession.getResolvedUnit(filePath);
     if (result is! ResolvedUnitResult) {
       throw StateError('Did not resolve to valid unit.');
@@ -98,9 +79,9 @@ class StringLiteralFinder {
     final visitor = StringLiteralFinderVisitor<dynamic>(
         filePath: filePath,
         unit: unit,
-        ignoreConstructorCalls: [],
-        ignoreMethodInvocationTargets: [],
-        ignoreStringLiteralRegexes: [],
+        ignoreConstructorCalls: options.ignoreConstructorCalls,
+        ignoreMethodInvocationTargets: options.ignoreMethodInvocationTargets,
+        ignoreStringLiteralRegexes: options.ignoreStringLiteralRegexes,
         foundStringLiteral: (foundStringLiteral) {
           foundStringLiterals.add(foundStringLiteral);
         });

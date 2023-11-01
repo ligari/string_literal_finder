@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:glob/glob.dart';
+import 'package:logging/logging.dart';
 import 'package:yaml/yaml.dart';
 
 class StringLiteralFinderAnalysisOptions {
@@ -11,6 +13,8 @@ class StringLiteralFinderAnalysisOptions {
     required this.ignoreStringLiteralRegexes,
     this.debug = false,
   });
+
+  static final _logger = Logger('string_literal_finder_analysis_options');
 
   static StringLiteralFinderAnalysisOptions loadFromYaml(String yamlSource) {
     final yaml =
@@ -53,5 +57,24 @@ class StringLiteralFinderAnalysisOptions {
 
   bool isExcluded(String path) {
     return excludeGlobs.any((glob) => glob.matches(path));
+  }
+
+  static StringLiteralFinderAnalysisOptions fromAnalysisContext(
+    AnalysisContext context,
+  ) {
+    final optionsPath = context.contextRoot.optionsFile;
+    _logger.info('Loading analysis options.');
+    final exists = optionsPath?.exists ?? false;
+    if (!exists || optionsPath == null) {
+      _logger.warning('Unable to resolve optionsFile.');
+      return StringLiteralFinderAnalysisOptions(
+        excludeGlobs: [],
+        ignoreConstructorCalls: [],
+        ignoreMethodInvocationTargets: [],
+        ignoreStringLiteralRegexes: [],
+      );
+    }
+    return StringLiteralFinderAnalysisOptions.loadFromYaml(
+        optionsPath.readAsStringSync());
   }
 }
