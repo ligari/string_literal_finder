@@ -17,7 +17,7 @@ const _argVerbose = 'verbose';
 const _argSilent = 'silent';
 const _argMetricsFile = 'metrics-output-file';
 const _argAnnotationFileAttest = 'annotations-output-file-attest';
-const _argAnnotationFileGithub = 'annotations-output-file-github';
+const _argAnnotationPrintGithub = 'annotations-print-github';
 const _argAnnotationRoot = 'annotations-path-root';
 
 /// Parse the command line arguments and run the [StringLiteralFinder].
@@ -38,8 +38,8 @@ Future<void> main(List<String> arguments) async {
     ..addOption(_argAnnotationFileAttest,
         help: 'File to write annotations to as taken by '
             'https://github.com/Attest/annotations-action/')
-    ..addOption(_argAnnotationFileGithub,
-        help: 'File to write annotations to usable by '
+    ..addFlag(_argAnnotationPrintGithub,
+        help: 'Whether to print annotations usable in GitHub CI as described by '
             'https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions')
     ..addOption(_argAnnotationRoot, help: 'Maks paths relative to the given root directory.')
     ..addFlag(_argVerbose, abbr: 'v')
@@ -87,10 +87,9 @@ Future<void> main(List<String> arguments) async {
       );
     }
     // write found string literals to annotations file for github format
-    final annotationsFileGithub = results[_argAnnotationFileGithub] as String?;
-    if (annotationsFileGithub != null) {
-      await _generateAnnotationsFileGithub(
-        annotationsFileGithub,
+    final annotationsFileGithub = results[_argAnnotationPrintGithub] as bool?;
+    if (annotationsFileGithub == true) {
+      await _generateAnnotationsGithub(
         foundStringLiterals,
         pathRelativeFrom: results[_argAnnotationRoot] as String?,
       );
@@ -161,8 +160,7 @@ Future<void> _generateAnnotationsFileAttest(
   await File(file).writeAsString(json.encode(annotations));
 }
 
-Future<void> _generateAnnotationsFileGithub(
-  String file,
+Future<void> _generateAnnotationsGithub(
   List<FoundStringLiteral> foundStringLiterals, {
   String? pathRelativeFrom,
 }) async {
@@ -170,7 +168,7 @@ Future<void> _generateAnnotationsFileGithub(
       ? (String p) => path.absolute(p)
       : (String p) => path.relative(p, from: pathRelativeFrom);
 
-  final annotations = foundStringLiterals
+  foundStringLiterals
       .map((e) => "::warning "
           "file=${resolvePath(e.filePath)},"
           "line=${e.loc.lineNumber},"
@@ -178,6 +176,5 @@ Future<void> _generateAnnotationsFileGithub(
           "col=${e.loc.columnNumber},"
           "endColumn=${e.locEnd.columnNumber}::"
           "String literal '${e.stringValue}'")
-      .toList();
-  await File(file).writeAsString(json.encode(annotations));
+      .forEach(print);
 }
