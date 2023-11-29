@@ -35,8 +35,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
   final List<RegExp> ignoreStringLiteralRegexes;
   static const List<RegExp> defaultIgnoreStringLiteralRegexes = [];
   final List<TypeChecker> ignoreMethodInvocationTargetTypeCheckers;
-  static const List<TypeChecker>
-      defaultIgnoreMethodInvocationTargetTypeCheckers = [
+  static const List<TypeChecker> defaultIgnoreMethodInvocationTargetTypeCheckers = [
     TypeChecker.fromRuntime(Logger),
   ];
   final List<TypeChecker> ignoreConstructorCallTypeCheckers;
@@ -44,16 +43,13 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     TypeChecker.fromRuntime(Uri),
     TypeChecker.fromRuntime(RegExp),
     TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
-    TypeChecker.fromUrl(
-        'package:flutter/src/painting/image_resolution.dart#AssetImage'),
-    TypeChecker.fromUrl(
-        'package:flutter/src/widgets/navigator.dart#RouteSettings'),
+    TypeChecker.fromUrl('package:flutter/src/painting/image_resolution.dart#AssetImage'),
+    TypeChecker.fromUrl('package:flutter/src/widgets/navigator.dart#RouteSettings'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#ValueKey'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#UniqueKey'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#LocalKey'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#Key'),
-    TypeChecker.fromUrl(
-        'package:flutter/src/services/platform_channel.dart#MethodChannel'),
+    TypeChecker.fromUrl('package:flutter/src/services/platform_channel.dart#MethodChannel'),
     TypeChecker.fromRuntime(StateError),
     TypeChecker.fromRuntime(Logger),
     TypeChecker.fromRuntime(Exception),
@@ -83,8 +79,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
 
     final next = node.endToken.next;
     final nextNext = next?.next;
-    _logger.finest(
-        '''Found string literal (${loc.lineNumber}:${loc.columnNumber}) $node
+    _logger.finest('''Found string literal (${loc.lineNumber}:${loc.columnNumber}) $node
          - parent: $parent (${parent.runtimeType})
          - parentParent: $pp (${pp.runtimeType} / ${pp!.parent?.runtimeType})
          - next: $next
@@ -100,8 +95,8 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     return super.visitStringLiteral(node);
   }
 
-  bool _checkArgumentAnnotation(ArgumentList argumentList,
-      ExecutableElement? executableElement, Expression nodeChildChild) {
+  bool _checkArgumentAnnotation(
+      ArgumentList argumentList, ExecutableElement? executableElement, Expression nodeChildChild) {
     final argPos = argumentList.arguments.indexOf(nodeChildChild);
     assert(argPos != -1);
     final arg = argumentList.arguments[argPos];
@@ -109,8 +104,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     if (arg is NamedExpression) {
       param = executableElement!.parameters.firstWhere(
           (element) => element.isNamed && element.name == arg.name.label.name,
-          orElse: () => throw StateError(
-              'Unable to find parameter of name ${arg.name.label} for '
+          orElse: () => throw StateError('Unable to find parameter of name ${arg.name.label} for '
               '$executableElement'));
     } else if (executableElement != null) {
       param = executableElement.parameters[argPos];
@@ -140,14 +134,10 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     }
 
     // iterate up the tree
-    for (;
-        node != null;
-        nodeChildChild = nodeChild, nodeChild = node, node = node.parent) {
+    for (; node != null; nodeChildChild = nodeChild, nodeChild = node, node = node.parent) {
       try {
         // ignore imports, parts and partOf
-        if (node is ImportDirective ||
-            node is PartDirective ||
-            node is PartOfDirective) {
+        if (node is ImportDirective || node is PartDirective || node is PartOfDirective) {
           return true;
         }
         // ignore annotations
@@ -157,7 +147,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
         }
         // ignore annotated class fields
         if (node is ClassDeclaration) {
-          if (nonNlsChecker.hasAnnotationOf(node.declaredElement2!)) {
+          if (nonNlsChecker.hasAnnotationOf(node.declaredElement!)) {
             if (nodeChild is FieldDeclaration) {
               if (nodeChild.isStatic) {
                 return true;
@@ -175,9 +165,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
               }
             } catch (e, stackTrace) {
               _logger.warning(
-                  'Unable to check annotation for $origNode at $filePath',
-                  e,
-                  stackTrace);
+                  'Unable to check annotation for $origNode at $filePath', e, stackTrace);
             }
           }
         }
@@ -197,24 +185,20 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
         if (node is InstanceCreationExpression) {
           assert(nodeChild == node.argumentList);
           // ignore annotated constructor calls
-          if (_checkArgumentAnnotation(
-              node.argumentList,
-              node.constructorName.staticElement,
+          if (_checkArgumentAnnotation(node.argumentList, node.constructorName.staticElement,
               nodeChildChild as Expression)) {
             return true;
           }
           // ignore constructor calls to types
-          for (final ignoredConstructorCall
-              in ignoreConstructorCallTypeCheckers) {
-            if (ignoredConstructorCall
-                .isAssignableFrom(node.staticType!.element2!)) {
+          for (final ignoredConstructorCall in ignoreConstructorCallTypeCheckers) {
+            if (ignoredConstructorCall.isAssignableFrom(node.staticType!.element2!)) {
               return true;
             }
           }
         }
         // ignore annotated variable declarations
         if (node is VariableDeclaration) {
-          final element = node.declaredElement2;
+          final element = node.declaredElement;
           if (element != null && nonNlsChecker.hasAnnotationOf(element)) {
             return true;
           }
@@ -243,18 +227,15 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
               // `string'.split('')` will not be found in the parent expression.
               node.argumentList.arguments.contains(nodeChildChild) &&
                   // check if the argument is annotated
-                  _checkArgumentAnnotation(
-                      node.argumentList,
-                      node.methodName.staticElement as ExecutableElement?,
-                      nodeChildChild)) {
+                  _checkArgumentAnnotation(node.argumentList,
+                      node.methodName.staticElement as ExecutableElement?, nodeChildChild)) {
             return true;
           }
           // ignore method calls to types
           if (node.target != null) {
             // ignore calls to types
             if (node.target!.staticType == null) {
-              _logger
-                  .warning('Unable to resolve staticType for ${node.target}');
+              _logger.warning('Unable to resolve staticType for ${node.target}');
             } else {
               final staticType = node.target!.staticType!;
               for (final checker in ignoreMethodInvocationTargetTypeCheckers) {
@@ -268,27 +249,24 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
         // ignore annotated function or method declarations
         if (node is FunctionDeclaration || node is MethodDeclaration) {
           if (node is Declaration) {
-            if (nonNlsChecker.hasAnnotationOf(node.declaredElement2!)) {
+            if (nonNlsChecker.hasAnnotationOf(node.declaredElement!)) {
               return true;
             }
           }
         }
       } catch (e, stackTrace) {
         final loc = lineInfo!.getLocation(origNode.offset);
-        _logger.severe('Error while analysing node $origNode at $filePath $loc',
-            e, stackTrace);
+        _logger.severe('Error while analysing node $origNode at $filePath $loc', e, stackTrace);
       }
     }
     // ignore line-end comments
     final lineNumber = lineInfo!.getLocation(origNode.end).lineNumber;
     var nextToken = origNode.endToken.next;
-    while (nextToken != null &&
-        lineInfo!.getLocation(nextToken.offset).lineNumber == lineNumber) {
+    while (nextToken != null && lineInfo!.getLocation(nextToken.offset).lineNumber == lineNumber) {
       nextToken = nextToken.next;
     }
     final comment = nextToken!.precedingComments;
-    if (comment != null &&
-        lineInfo!.getLocation(comment.offset).lineNumber == lineNumber) {
+    if (comment != null && lineInfo!.getLocation(comment.offset).lineNumber == lineNumber) {
       if (comment.value().contains('NON-NLS')) {
         return true;
       }
