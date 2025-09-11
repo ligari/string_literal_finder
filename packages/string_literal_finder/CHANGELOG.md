@@ -1,3 +1,19 @@
+## 1.5.0-dev.1
+
+* Migrate to Element2 https://github.com/dart-lang/sdk/blob/main/pkg/analyzer/doc/element_model_migration_guide.md
+  * source_gen 3.0
+  * analyzer 7.4
+
+## 1.4.0
+
+* Analyzer 7.0.0
+* source_gen 2.0.0
+
+## 1.3.0+2
+
+* Analyzer 6.0.0
+* Upgrade dependency constraints.
+
 ## 1.3.0+1
 
 * Analyzer 5.0.0

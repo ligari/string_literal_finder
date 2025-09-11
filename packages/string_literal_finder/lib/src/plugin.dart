@@ -240,7 +240,7 @@ class StringLiteralFinderPlugin extends ServerPlugin {
         errors.add(
           plugin.AnalysisErrorFixes(
             plugin.AnalysisError(
-              plugin.AnalysisErrorSeverity('WARNING'),
+              plugin.AnalysisErrorSeverity.WARNING,
               plugin.AnalysisErrorType.LINT,
               location,
               'Found string literal: $stringCode',
