@@ -3,6 +3,7 @@ description: |
   Find non translated strings: Searches all dart files for string literals, excluding non
   translatable strings. Useful for i18n/l10n.
 version: 1.5.0-dev.1
+publish_to: none
 homepage: https://github.com/hpoul/string_literal_finder/tree/master/packages/string_literal_finder
 
 environment:
@@ -32,4 +33,3 @@ dev_dependencies:
 
 executables:
   string_literal_finder:
-
