@@ -10,5 +10,5 @@ dependencies:
   string_literal_finder:
     git:
         url: git@github.com:ligari/string_literal_finder.git
-        ref: experimental
+        ref: develop
         path: packages/string_literal_finder

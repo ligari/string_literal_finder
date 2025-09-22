@@ -19,7 +19,7 @@ dependencies:
   string_literal_finder_annotations:
     git:
         url: git@github.com:ligari/string_literal_finder.git
-        ref: experimental
+        ref: develop
         path: packages/string_literal_finder_annotations
   args: ">=2.0.0 <3.0.0"
   analyzer_plugin: ^0.13.7
