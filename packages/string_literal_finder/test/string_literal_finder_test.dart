@@ -22,8 +22,7 @@ Future<List<FoundStringLiteral>> _findStrings(String source) async {
     modificationStamp: DateTime.now().millisecondsSinceEpoch ~/ 1000,
   );
   // final parsed = parseString(content: source);
-  final parsed = await resolveFile2(path: filePath, resourceProvider: overlay)
-      as ResolvedUnitResult;
+  final parsed = await resolveFile(path: filePath, resourceProvider: overlay) as ResolvedUnitResult;
   if (!parsed.exists) {
     throw StateError('file not found?');
   }

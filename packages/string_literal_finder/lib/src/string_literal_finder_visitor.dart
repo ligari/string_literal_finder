@@ -1,6 +1,6 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
-import 'package:analyzer/dart/element/element2.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/source/line_info.dart';
 import 'package:logging/logging.dart';
 import 'package:source_gen/source_gen.dart';
@@ -31,17 +31,17 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
         ];
 
   // Database expressions
-  static const TypeChecker nonNlsChecker = TypeChecker.fromRuntime(NonNlsArg);
+  static const TypeChecker nonNlsChecker = TypeChecker.typeNamed(NonNlsArg);
   final List<RegExp> ignoreStringLiteralRegexes;
   static const List<RegExp> defaultIgnoreStringLiteralRegexes = [];
   final List<TypeChecker> ignoreMethodInvocationTargetTypeCheckers;
   static const List<TypeChecker> defaultIgnoreMethodInvocationTargetTypeCheckers = [
-    TypeChecker.fromRuntime(Logger),
+    TypeChecker.typeNamed(Logger),
   ];
   final List<TypeChecker> ignoreConstructorCallTypeCheckers;
   static const List<TypeChecker> defaultIgnoreConstructorCallTypeCheckers = [
-    TypeChecker.fromRuntime(Uri),
-    TypeChecker.fromRuntime(RegExp),
+    TypeChecker.typeNamed(Uri),
+    TypeChecker.typeNamed(RegExp),
     TypeChecker.fromUrl('package:flutter/src/widgets/image.dart#Image'),
     TypeChecker.fromUrl('package:flutter/src/painting/image_resolution.dart#AssetImage'),
     TypeChecker.fromUrl('package:flutter/src/widgets/navigator.dart#RouteSettings'),
@@ -50,10 +50,10 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#LocalKey'),
     TypeChecker.fromUrl('package:flutter/src/foundation/key.dart#Key'),
     TypeChecker.fromUrl('package:flutter/src/services/platform_channel.dart#MethodChannel'),
-    TypeChecker.fromRuntime(StateError),
-    TypeChecker.fromRuntime(Logger),
-    TypeChecker.fromRuntime(Exception),
-    TypeChecker.fromRuntime(Error),
+    TypeChecker.typeNamed(StateError),
+    TypeChecker.typeNamed(Logger),
+    TypeChecker.typeNamed(Exception),
+    TypeChecker.typeNamed(Error),
   ];
 
   final String filePath;
@@ -96,7 +96,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
   }
 
   bool _checkArgumentAnnotation(
-      ArgumentList argumentList, ExecutableElement2? executableElement, Expression nodeChildChild) {
+      ArgumentList argumentList, ExecutableElement? executableElement, Expression nodeChildChild) {
     if (executableElement == null) return false;
     final argPos = argumentList.arguments.indexOf(nodeChildChild);
     assert(argPos != -1);
@@ -104,7 +104,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
     FormalParameterElement param;
     if (arg is NamedExpression) {
       param = executableElement.formalParameters.firstWhere(
-          (element) => element.isNamed && element.name3 == arg.name.label.name,
+          (element) => element.isNamed && element.name == arg.name.label.name,
           orElse: () => throw StateError('Unable to find parameter of name ${arg.name.label} for '
               '$executableElement'));
     } else {
@@ -170,7 +170,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
         // ignore annotated enum constants
         if (node is EnumConstantArguments) {
           final constantDeclaration = node.parent as EnumConstantDeclaration;
-          final constructor = constantDeclaration.constructorElement2;
+          final constructor = constantDeclaration.constructorElement;
           if (_checkArgumentAnnotation(
             node.argumentList,
             constructor,
@@ -189,14 +189,14 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
           }
           // ignore constructor calls to types
           for (final ignoredConstructorCall in ignoreConstructorCallTypeCheckers) {
-            if (ignoredConstructorCall.isAssignableFrom(node.staticType!.element3!)) {
+            if (ignoredConstructorCall.isAssignableFrom(node.staticType!.element!)) {
               return true;
             }
           }
         }
         // ignore annotated variable declarations
         if (node is VariableDeclaration) {
-          final element = node.declaredFragment?.element ?? node.declaredElement2;
+          final element = node.declaredFragment?.element ?? node.declaredElement;
           if (element != null && nonNlsChecker.hasAnnotationOf(element)) {
             return true;
           }
@@ -226,7 +226,7 @@ class StringLiteralFinderVisitor<R> extends GeneralizingAstVisitor<R> {
               node.argumentList.arguments.contains(nodeChildChild) &&
                   // check if the argument is annotated
                   _checkArgumentAnnotation(node.argumentList,
-                      node.methodName.element as ExecutableElement2?, nodeChildChild)) {
+                      node.methodName.element as ExecutableElement?, nodeChildChild)) {
             return true;
           }
           // ignore method calls to types
